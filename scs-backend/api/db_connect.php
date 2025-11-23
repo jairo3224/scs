@@ -20,16 +20,29 @@ if (php_sapi_name() !== 'cli' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS
     http_response_code(200);
     exit;
 }
-// ...existing code...
-$host = "localhost";
+
+// DB config — use 127.0.0.1 and explicit port for Windows/XAMPP
+$host = "127.0.0.1";
+$port = 3306;
 $dbname = "scs_db";
 $username = "root";
 $password = "";
 
+// Helpful debug: show clean JSON error instead of dying with raw PDO message
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8";
+    $pdo = new PDO($dsn, $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
 } catch (PDOException $e) {
-    die(json_encode(["success" => false, "error" => "Database connection failed: " . $e->getMessage()]));
+    // Temporary: return JSON with helpful error for local debugging.
+    // Remove detailed message in production.
+    http_response_code(500);
+    echo json_encode([
+        "success" => false,
+        "error" => "Database connection failed: " . $e->getMessage()
+    ]);
+    exit;
 }
 ?>

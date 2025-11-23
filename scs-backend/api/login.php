@@ -1,4 +1,9 @@
 <?php
+
+header("Content-Type: application/json; charset=UTF-8");
+error_reporting(0);
+
+
 header("Content-Type: application/json");
 // Allow requests from your frontend (you can use * during development)
 header("Access-Control-Allow-Origin: http://localhost:3000");
@@ -8,6 +13,11 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization");
 // respond to preflight and stop
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    echo json_encode(['ok' => true, 'time' => date('c')]);
     exit;
 }
 
@@ -47,4 +57,10 @@ try {
 } catch (Exception $e) {
     echo json_encode(["success" => false, "error" => $e->getMessage()]);
 }
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(["success" => false, "message" => "POST required"]);
+    exit;
+}
+
 ?>
