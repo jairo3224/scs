@@ -1,27 +1,60 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
-header("Access-Control-Allow-Headers: *");
 
-include "../config/db.php";
+include __DIR__ . "/../db_connect.php";
 
-$data = json_decode(file_get_contents("php://input"), true);
+// Enable error reporting for debugging
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-$title = $data['title'];
-$description = $data['description'];
-$date = $data['date'];
-$time = $data['time'];
-$location = $data['location'];
+try {
+    // Get JSON POST data
+    $data = json_decode(file_get_contents("php://input"), true);
 
-$sql = "INSERT INTO events (title, description, date, time, location)
-        VALUES (?, ?, ?, ?, ?)";
+    $title       = trim($data['title'] ?? '');
+    $description = trim($data['description'] ?? null);
+    $location    = trim($data['location'] ?? null);
+    $event_date  = trim($data['event_date'] ?? '');
+    $time        = trim($data['time'] ?? null);
+    $created_by  = intval($data['created_by'] ?? 1); // default 1 for testing
 
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("sssss", $title, $description, $date, $time, $location);
+    // Validation
+    if (!$title || !$event_date) {
+        echo json_encode(["success" => false, "error" => "Title and Date are required"]);
+        exit;
+    }
 
-if ($stmt->execute()) {
+    // Prepare SQL
+    $stmt = $conn->prepare("
+        INSERT INTO events (title, description, location, event_date, time, created_by) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+
+    if (!$stmt) {
+        throw new Exception("Prepare failed: " . $conn->error);
+    }
+
+    // Bind parameters
+    $stmt->bind_param(
+        "sssssi",
+        $title,
+        $description,
+        $location,
+        $event_date,
+        $time,
+        $created_by
+    );
+
+    // Execute
+    $stmt->execute();
+
     echo json_encode(["success" => true, "message" => "Event created successfully"]);
-} else {
-    echo json_encode(["success" => false, "message" => "Error creating event"]);
+
+} catch (mysqli_sql_exception $e) {
+    echo json_encode(["success" => false, "error" => "MySQL error: " . $e->getMessage()]);
+} catch (Exception $e) {
+    echo json_encode(["success" => false, "error" => "PHP error: " . $e->getMessage()]);
+} finally {
+    if (isset($stmt) && $stmt) $stmt->close();
+    if (isset($conn) && $conn) $conn->close();
 }
-?>

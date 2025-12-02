@@ -1,32 +1,36 @@
 <?php
-
 header("Content-Type: application/json; charset=UTF-8");
-error_reporting(0);
-
-
-header("Content-Type: application/json");
-// Allow requests from your frontend (you can use * during development)
 header("Access-Control-Allow-Origin: http://localhost:3000");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// respond to preflight and stop
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo json_encode(['ok' => true, 'time' => date('c')]);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode([
+        "success" => false,
+        "error" => "POST request required"
+    ]);
     exit;
 }
 
-// include file in same folder (was ../db_connect.php which caused "no such file")
 include 'db_connect.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
-$email = $data['email'] ?? '';
+
+$email = trim($data['email'] ?? '');
 $password = $data['password'] ?? '';
+
+if ($email === '' || $password === '') {
+    echo json_encode([
+        "success" => false,
+        "error" => "Email and password required"
+    ]);
+    exit;
+}
 
 try {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
@@ -34,33 +38,44 @@ try {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
-        echo json_encode(["success" => false, "error" => "Invalid email or password"]);
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid email or password"
+        ]);
         exit;
     }
 
-    if (!password_verify($password, $user['password'])) {
-        echo json_encode(["success" => false, "error" => "Invalid email or password"]);
+    $storedPassword = $user['password'];
+
+    // Allow hashed or plaintext passwords
+    $valid = password_verify($password, $storedPassword) || $password === $storedPassword;
+
+    if (!$valid) {
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid email or password"
+        ]);
         exit;
     }
 
+    // SUCCESS RESPONSE — no error sent
     echo json_encode([
         "success" => true,
         "user" => [
-            "role" => $user['role'],
-            "full_name" => $user['full_name'],
             "id" => $user['id'],
-            "student_id" => $user['student_id'],
-            "phone" => $user['phone']
+            "full_name" => $user['full_name'],
+            "email" => $user['email'],
+            "role" => $user['role'],
+            "phone" => $user['phone'],
+            "student_id" => $user['student_id']
         ]
     ]);
+    exit;
 
 } catch (Exception $e) {
-    echo json_encode(["success" => false, "error" => $e->getMessage()]);
+    echo json_encode([
+        "success" => false,
+        "error" => "Server error: " . $e->getMessage()
+    ]);
 }
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(["success" => false, "message" => "POST required"]);
-    exit;
-}
-
 ?>
